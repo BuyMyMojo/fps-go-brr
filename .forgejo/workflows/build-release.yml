@@ -51,13 +51,13 @@ jobs:
         cp fps-go-brr-compact release/fps-go-brr-compact-${{ steps.version.outputs.version }}
         
     - name: Upload normal binary
-      uses: actions/upload-artifact@v4
+      uses: forgejo/upload-artifact@v4
       with:
         name: fps-go-brr-normal-${{ steps.version.outputs.version }}
         path: release/fps-go-brr-${{ steps.version.outputs.version }}
         
     - name: Upload compact binary
-      uses: actions/upload-artifact@v4
+      uses: forgejo/upload-artifact@v4
       with:
         name: fps-go-brr-compact-${{ steps.version.outputs.version }}
         path: release/fps-go-brr-compact-${{ steps.version.outputs.version }}
