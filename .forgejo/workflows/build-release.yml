@@ -61,12 +61,12 @@ jobs:
         
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
+      uses: actions/forgejo-release@v2
       with:
-        files: |
-          release/fps-go-brr-${{ steps.version.outputs.version }}
-          release/fps-go-brr-compact-${{ steps.version.outputs.version }}
-        body: |
+        direction: upload
+        token: ${{ secrets.GITHUB_TOKEN }}
+        release-dir: release
+        release-notes: |
           ## fps-go-brr ${{ steps.version.outputs.version }}
           
           ### Downloads
