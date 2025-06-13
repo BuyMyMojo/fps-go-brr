@@ -62,6 +62,21 @@ go mod download
 - Normal and compact builds are uploaded as separate artifacts
 - UPX compression applied to compact builds for size optimization
 
+## Repository Information
+
+- **Main Repository**: https://git.aria.coffee/aria/fps-go-brr (Personal Forgejo instance)
+- **Mirror**: https://github.com/BuyMyMojo/fps-go-brr (GitHub - accepts PRs and issues)
+- **Dual Licensed**: MIT OR Apache-2.0 (SPDX-License-Identifier: MIT OR Apache-2.0)
+- **Copyright**: 2025 Aria, Wicket
+
+### Inspirations
+
+This project draws inspiration from:
+- Digital Foundry (YouTube) - Professional video game performance analysis
+- Brazil Pixel (YouTube) - Technical video analysis and frame rate studies  
+- TRDrop (GitHub) - Raw video analysis program for framerate estimation
+- Original Python implementation - Early proof-of-concept for frame persistence analysis
+
 ## Memories
 
 - The forgejo workflow runner is executed as root so it does not need to use root

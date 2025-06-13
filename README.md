@@ -124,6 +124,14 @@ This project draws inspiration from:
 
 The goal is to provide similar professional-grade video analysis capabilities for the open-source community.
 
+## Note on AI use
+
+The use of AI in this project is minor and just an experiment, all major design decisions and functionality are heavily worked on by humans!
+
+I do hope for future AI tools with ethical models to be avaliable and verifiable in the future!
+
+The testing phase for Claude's coding agent in this repo is finished and it shall not contribute more to the code at the current time.
+
 ## License
 
 SPDX-License-Identifier: MIT OR Apache-2.0
