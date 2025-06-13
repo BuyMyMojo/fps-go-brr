@@ -1,3 +1,16 @@
+## 0.1.1 (2025-06-14)
+
+### Feat
+
+- **workflow**: run on normal commits too
+
+### Fix
+
+- **workflow**: fix artifact upload
+- **workflow**: remove sudo again
+- **workflow**: fix the upx install
+- **workflow**: fix release workflow
+
 ## 0.1.0 (2025-06-14)
 
 ### Feat

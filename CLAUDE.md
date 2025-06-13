@@ -36,8 +36,13 @@ The application is built using:
 
 ### Build and Run
 ```bash
+# Normal build
 go build -o fps-go-brr .
 ./fps-go-brr <command> [args]
+
+# Optimized compact build (requires UPX)
+./build-compact.sh
+./fps-go-brr-compact <command> [args]
 ```
 
 ### Testing
@@ -50,6 +55,16 @@ go test ./...
 go mod tidy
 go mod download
 ```
+
+### Release Builds
+- Forgejo Actions automatically build and release both normal and compact binaries on tag pushes
+- Uses custom runner: `9950x`
+- Normal and compact builds are uploaded as separate artifacts
+- UPX compression applied to compact builds for size optimization
+
+## Memories
+
+- The forgejo workflow runner is executed as root so it does not need to use root
 
 ## CLI Usage
 
