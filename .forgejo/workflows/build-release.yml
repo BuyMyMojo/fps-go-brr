@@ -21,8 +21,8 @@ jobs:
         
     - name: Install UPX
       run: |
-        sudo apt update
-        sudo apt install -y upx-ucl
+        apt update
+        apt install -y upx-ucl
         
     - name: Build normal binary
       run: |
