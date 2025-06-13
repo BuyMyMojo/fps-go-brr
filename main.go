@@ -19,7 +19,7 @@ func main() {
 				Name:  "count-frames",
 				Usage: "Count frames",
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					// fmt.Println("added task: ", cmd.Args().First())
+
 					return count_video_frames(cmd.Args().First())
 				},
 			},
@@ -36,7 +36,7 @@ func main() {
 				},
 
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					// fmt.Println("added task: ", cmd.Args().First())
+
 					first_frame, _ := getImageFromFilePath(cmd.StringArg("frame1"))
 					second_frame, _ := getImageFromFilePath(cmd.StringArg("frame2"))
 
@@ -58,7 +58,7 @@ func main() {
 				},
 
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					// fmt.Println("added task: ", cmd.Args().First())
+
 					first_frame, _ := getImageFromFilePath(cmd.StringArg("frame1"))
 					second_frame, _ := getImageFromFilePath(cmd.StringArg("frame2"))
 
@@ -80,7 +80,7 @@ func main() {
 				},
 
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					return countUniqueVideoFrames(cmd.StringArg("video1"), cmd.StringArg("video2"), 1)
+					return countUniqueVideoFrames(cmd.StringArg("video1"), cmd.StringArg("video2"), 1, false)
 				},
 			},
 		},
@@ -111,32 +111,26 @@ func count_video_frames(video string) error {
 }
 
 func compare_frames(frame1 *image.RGBA, frame2 *image.RGBA) error {
-	// diff_frame := image.NewRGBA(frame1.Rect)
-
 	accumError := int64(0)
-
 	for i := 0; i < len(frame1.Pix); i++ {
-		accumError += int64(sqDiffUInt8(frame1.Pix[i], frame2.Pix[i]))
+
+		if isDiffUInt8WithTolerance(frame1.Pix[i], frame2.Pix[i], 0) { // Set tolerance to 0
+			accumError++
+		}
 	}
-
-	log.Default().Println("Total image error: " + strconv.FormatInt(accumError, 10))
-
+	log.Default().Println("Total differing pixels: " + strconv.FormatInt(accumError, 10))
 	return nil
 }
 
 func compare_frames_alt(frame1 *image.RGBA, frame2 *image.RGBA) error {
 	// diff_frame := image.NewRGBA(frame1.Rect)
-
 	accumError := int64(0)
-
 	for i := 0; i < len(frame1.Pix); i++ {
 		if isDiffUInt8(frame1.Pix[i], frame2.Pix[i]) {
 			accumError++
 		}
 	}
-
 	log.Default().Println("Total differing pixels: " + strconv.FormatInt(accumError, 10))
-
 	return nil
 }
 
@@ -148,12 +142,58 @@ func sqDiffUInt8(x, y uint8) uint64 {
 func isDiffUInt8(x, y uint8) bool {
 	d := uint64(x) - uint64(y)
 	sq := d * d
-
 	if sq > 0 {
 		return true
 	} else {
 		return false
 	}
+}
+
+func isDiffUInt8WithTolerance(x, y uint8, tolerance uint64) bool {
+	d := uint64(x) - uint64(y)
+	sq := d * d
+	if sq > tolerance {
+		return true
+	} else {
+		return false
+	}
+}
+
+func countUniqueVideoFrames(video_path1 string, video_path2 string, min_diff uint64, use_sq_diff bool) error {
+	video1, _ := vidio.NewVideo(video_path1)
+	video2, _ := vidio.NewVideo(video_path2)
+	video1_frame := image.NewRGBA(image.Rect(0, 0, video1.Width(), video1.Height()))
+	video2_frame := image.NewRGBA(image.Rect(0, 0, video2.Width(), video2.Height()))
+	video1.SetFrameBuffer(video1_frame.Pix)
+	video2.SetFrameBuffer(video2_frame.Pix)
+	total_frames := 0
+	unique_frames := 0
+	for video1.Read() {
+		total_frames++
+		video2.Read()
+		accumError := uint64(0)
+		for i := 0; i < len(video1_frame.Pix); i++ {
+			if use_sq_diff {
+				if isDiffUInt8WithTolerance(video1_frame.Pix[i], video2_frame.Pix[i], min_diff) {
+					accumError++
+				}
+			} else {
+				if isDiffUInt8(video1_frame.Pix[i], video2_frame.Pix[i]) {
+					accumError++
+				}
+			}
+		}
+		if min_diff <= accumError {
+			unique_frames++
+			log.Default().Println("[" + strconv.Itoa(total_frames) + "]Unique frame")
+		} else {
+			log.Default().Println("[" + strconv.Itoa(total_frames) + "]Non-unique frame")
+		}
+	}
+	video1.Close()
+	video2.Close()
+	log.Default().Println(strconv.Itoa(unique_frames) + "/" + strconv.Itoa(total_frames) + " are unique!")
+	return nil
 }
 
 func imageToRGBA(src image.Image) *image.RGBA {
@@ -178,43 +218,4 @@ func getImageFromFilePath(filePath string) (image.Image, error) {
 	defer f.Close()
 	image, _, err := image.Decode(f)
 	return image, err
-}
-
-func countUniqueVideoFrames(video_path1 string, video_path2 string, min_diff int64) error {
-	video1, _ := vidio.NewVideo(video_path1)
-	video2, _ := vidio.NewVideo(video_path2)
-
-	video1_frame := image.NewRGBA(image.Rect(0, 0, video1.Width(), video1.Height()))
-	video2_frame := image.NewRGBA(image.Rect(0, 0, video2.Width(), video2.Height()))
-	video1.SetFrameBuffer(video1_frame.Pix)
-	video2.SetFrameBuffer(video2_frame.Pix)
-
-	total_frames := 0
-	unique_frames := 0
-	for video1.Read() {
-		total_frames++
-		video2.Read()
-
-		accumError := int64(0)
-
-		for i := 0; i < len(video1_frame.Pix); i++ {
-			if isDiffUInt8(video1_frame.Pix[i], video2_frame.Pix[i]) {
-				accumError++
-			}
-		}
-
-		if min_diff <= accumError {
-			unique_frames++
-			log.Default().Println("[" + strconv.Itoa(total_frames) + "]Unique frame")
-		} else {
-			log.Default().Println("[" + strconv.Itoa(total_frames) + "]Non-unique frame")
-		}
-	}
-
-	video1.Close()
-	video2.Close()
-
-	log.Default().Println(strconv.Itoa(unique_frames) + "/" + strconv.Itoa(total_frames) + " are unique!")
-
-	return nil
 }
