@@ -21,8 +21,11 @@ jobs:
         
     - name: Install UPX
       run: |
-        apt update
-        apt install -y upx-ucl
+        wget -O upx.tar.xz https://github.com/upx/upx/releases/download/v5.0.1/upx-5.0.1-amd64_linux.tar.xz
+        tar -xf upx.tar.xz
+        sudo cp upx-5.0.1-amd64_linux/upx /usr/local/bin/
+        sudo cp upx-5.0.1-amd64_linux/upx.1 /usr/local/share/man/man1/ || true
+        chmod +x /usr/local/bin/upx
         
     - name: Build normal binary
       run: |
