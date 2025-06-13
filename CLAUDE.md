@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Go CLI application for video frame analysis and comparison. The project provides tools to count frames in videos, compare individual frames, analyze differences between two videos, and perform frame persistence analysis for single videos.
+This is a Go CLI application for professional video frame analysis and comparison. The project provides tools to count frames in videos, compare individual frames, analyze differences between two videos, and perform comprehensive frame persistence analysis for single videos with DigitalFoundry-style CSV output.
 
 ## Core Architecture
 
@@ -12,13 +12,15 @@ The application is built using:
 - **CLI Framework**: urfave/cli/v3 for command-line interface
 - **Video Processing**: AlexEidt/Vidio library for video file handling with FPS detection
 - **Image Processing**: Standard Go image libraries for frame comparison
+- **CSV Export**: Built-in CSV generation for professional video analysis visualization
 
 ### Main Components
 
 - **CLI Commands**: Five main commands for comprehensive frame analysis operations
 - **Frame Comparison**: Pixel-level comparison with configurable tolerance using squared difference
 - **Video Processing**: Frame-by-frame video analysis with streaming support and memory-efficient processing
-- **Frame Persistence Analysis**: Detects consecutive duplicate frames and calculates persistence duration
+- **Two-Pass Analysis**: Advanced frame persistence analysis with pre-calculated total durations
+- **CSV Generation**: DigitalFoundry-style data export for professional visualization tools
 
 ### Key Functions
 
@@ -26,7 +28,7 @@ The application is built using:
 - `compare_frames()`: Compares two frames with tolerance-based difference detection
 - `compare_frames_alt()`: Alternative frame comparison using exact pixel matching
 - `countUniqueVideoFrames()`: Analyzes differences between corresponding frames in two videos
-- `analyzeFramePersistence()`: **Main feature** - Analyzes frame persistence in single video with per-second statistics
+- `analyzeFramePersistence()`: **Main feature** - Two-pass frame persistence analysis with CSV export
 - `isDiffUInt8WithTolerance()`: Pixel comparison with configurable tolerance threshold
 - `imageToRGBA()`: Converts images to RGBA format for consistent processing
 
@@ -56,17 +58,63 @@ Available commands:
 - `compare-frames <frame1> <frame2>` - Compare two image frames
 - `count-frames-differing-pixels <frame1> <frame2>` - Count pixel differences between frames
 - `count-unique-video-frames <video1> <video2>` - Compare corresponding frames between two videos
-- `analyze-frame-persistence [--tolerance float] <video>` - **Main feature**: Analyze frame persistence and unique frames per second
+- `analyze-frame-persistence [--tolerance float] [--csv-output path] <video>` - **Main feature**: Professional video analysis with CSV export
 
-### Frame Persistence Analysis
+### Frame Persistence Analysis with CSV Export
 
 The main feature provides:
 - Real-time FPS detection from video metadata
 - Frame-by-frame comparison with previous frame
 - Detection of consecutive duplicate frame sequences (3+ identical frames)
 - Per-second unique frame counting
-- Persistence duration calculation in milliseconds
+- Two-pass analysis for accurate total frame persistence calculation
 - Configurable pixel difference tolerance (0-255)
+- **Professional CSV export** with 5 columns for DigitalFoundry-style analysis
+
+### CSV Output Format
+
+The `--csv-output` flag generates a CSV file with these columns:
+- `frame`: Frame number (1-based, no skipped frames)
+- `average_fps`: Running effective FPS calculation
+- `frame_time`: Current frame persistence duration (real-time)
+- `unique_frame_count`: Cumulative unique frame count (stays constant during duplicates)
+- `real_frame_time`: **Total persistence time for each unique frame (smooth for visualization)**
+
+### CSV Usage Examples
+
+```bash
+# Basic analysis with CSV export
+./fps-go-brr analyze-frame-persistence video.mp4 --csv-output analysis.csv
+
+# With tolerance for noisy videos
+./fps-go-brr analyze-frame-persistence video.mp4 --tolerance 10 --csv-output analysis.csv
+```
+
+## Advanced Implementation Details
+
+### Two-Pass Analysis Architecture
+
+The `analyzeFramePersistence()` function uses a sophisticated two-pass approach:
+
+1. **First Pass**: Analyzes entire video to calculate total duration each unique frame will persist
+2. **Second Pass**: Writes CSV with correct `real_frame_time` values for smooth visualization
+
+This ensures:
+- All instances of the same unique frame show identical `real_frame_time` values
+- Creates smooth, non-jumpy graphs perfect for professional video analysis
+- DigitalFoundry-style frame timing visualization compatibility
+
+### Frame Data Structure
+
+```go
+type FrameData struct {
+    frameNumber      int     // Current frame number
+    uniqueFrameCount int     // Cumulative unique frames
+    effectiveFPS     float64 // Running average FPS
+    currentFrameTime float64 // Current persistence so far
+    realFrameTime    float64 // Total persistence duration
+}
+```
 
 ## Implementation Notes
 
@@ -74,5 +122,7 @@ The main feature provides:
 - Pixel comparison uses squared difference for tolerance-based matching
 - Video processing is done frame-by-frame to handle large files efficiently
 - Frame persistence detection only reports sequences of 3+ consecutive identical frames
+- Two-pass analysis ensures accurate total persistence calculations for visualization
+- CSV output is optimized for professional video analysis tools and graphing software
+- The `analyze-frame-persistence` command is the primary tool for professional video quality analysis
 - All image formats supported by Go's image package can be used for frame comparison
-- The `analyze-frame-persistence` command is the primary tool for video quality analysis

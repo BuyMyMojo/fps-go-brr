@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
+	"fmt"
 	"image"
 	"image/draw"
 	"log"
@@ -97,10 +99,16 @@ func main() {
 						Usage: "Pixel difference tolerance (0-255)",
 						Value: 0,
 					},
+					&cli.StringFlag{
+						Name:  "csv-output",
+						Usage: "Path to CSV file for frame data output",
+						Value: "",
+					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					tolerance := uint64(cmd.Float64("tolerance"))
-					return analyzeFramePersistence(cmd.StringArg("video"), tolerance)
+					csvOutput := cmd.String("csv-output")
+					return analyzeFramePersistence(cmd.StringArg("video"), tolerance, csvOutput)
 				},
 			},
 		},
@@ -240,7 +248,7 @@ func getImageFromFilePath(filePath string) (image.Image, error) {
 	return image, err
 }
 
-func analyzeFramePersistence(videoPath string, tolerance uint64) error {
+func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput string) error {
 	video, err := vidio.NewVideo(videoPath)
 	if err != nil {
 		return err
@@ -252,10 +260,41 @@ func analyzeFramePersistence(videoPath string, tolerance uint64) error {
 
 	log.Default().Printf("Video FPS: %.2f, Frame time: %.2f ms", fps, frameTimeMs)
 
+	var csvWriter *csv.Writer
+	var csvFile *os.File
+	if csvOutput != "" {
+		csvFile, err = os.Create(csvOutput)
+		if err != nil {
+			return fmt.Errorf("failed to create CSV file: %v", err)
+		}
+		defer csvFile.Close()
+		
+		csvWriter = csv.NewWriter(csvFile)
+		defer csvWriter.Flush()
+		
+		err = csvWriter.Write([]string{"frame", "average_fps", "frame_time", "unique_frame_count", "real_frame_time"})
+		if err != nil {
+			return fmt.Errorf("failed to write CSV header: %v", err)
+		}
+	}
+
+	// Data structures for frame analysis
+	type FrameData struct {
+		frameNumber      int
+		uniqueFrameCount int
+		effectiveFPS     float64
+		currentFrameTime float64
+		realFrameTime    float64
+	}
+	
+	var frameAnalysisData []FrameData
+	var uniqueFrameDurations []int // Duration of each unique frame
+	
 	currentFrame := image.NewRGBA(image.Rect(0, 0, video.Width(), video.Height()))
 	previousFrame := image.NewRGBA(image.Rect(0, 0, video.Width(), video.Height()))
 	video.SetFrameBuffer(currentFrame.Pix)
 
+	// FIRST PASS: Analyze frame durations
 	var frameNumber int
 	var uniqueFramesPerSecond []int
 	var framePersistenceDurations []float64
@@ -263,6 +302,8 @@ func analyzeFramePersistence(videoPath string, tolerance uint64) error {
 	currentSecond := 0
 	uniqueFramesInCurrentSecond := 0
 	consecutiveDuplicateCount := 0
+	totalUniqueFrames := 0
+	currentUniqueFrameDuration := 1
 
 	hasFirstFrame := false
 
@@ -273,6 +314,20 @@ func analyzeFramePersistence(videoPath string, tolerance uint64) error {
 			copy(previousFrame.Pix, currentFrame.Pix)
 			hasFirstFrame = true
 			uniqueFramesInCurrentSecond = 1
+			totalUniqueFrames = 1
+			currentUniqueFrameDuration = 1
+			
+			// Store data for first frame
+			currentTime := float64(frameNumber) / fps
+			effectiveFPS := float64(totalUniqueFrames) / currentTime
+			actualFrameTimeMs := float64(currentUniqueFrameDuration) * frameTimeMs
+			frameAnalysisData = append(frameAnalysisData, FrameData{
+				frameNumber:      frameNumber,
+				uniqueFrameCount: totalUniqueFrames,
+				effectiveFPS:     effectiveFPS,
+				currentFrameTime: actualFrameTimeMs,
+				realFrameTime:    0, // Will be calculated in second pass
+			})
 			continue
 		}
 
@@ -291,7 +346,17 @@ func analyzeFramePersistence(videoPath string, tolerance uint64) error {
 
 		if !isFrameDifferent {
 			consecutiveDuplicateCount++
+			currentUniqueFrameDuration++
 		} else {
+			// Record the duration of the previous unique frame
+			if totalUniqueFrames > 0 {
+				if len(uniqueFrameDurations) < totalUniqueFrames {
+					uniqueFrameDurations = append(uniqueFrameDurations, currentUniqueFrameDuration)
+				} else {
+					uniqueFrameDurations[totalUniqueFrames-1] = currentUniqueFrameDuration
+				}
+			}
+			
 			if consecutiveDuplicateCount > 1 {
 				persistenceMs := float64(consecutiveDuplicateCount+1) * frameTimeMs
 				framePersistenceDurations = append(framePersistenceDurations, persistenceMs)
@@ -300,8 +365,24 @@ func analyzeFramePersistence(videoPath string, tolerance uint64) error {
 			consecutiveDuplicateCount = 0
 
 			uniqueFramesInCurrentSecond++
+			totalUniqueFrames++
 			copy(previousFrame.Pix, currentFrame.Pix)
+			
+			// Start tracking new unique frame
+			currentUniqueFrameDuration = 1
 		}
+
+		// Store data for EVERY frame
+		currentTime := float64(frameNumber) / fps
+		effectiveFPS := float64(totalUniqueFrames) / currentTime
+		actualFrameTimeMs := float64(currentUniqueFrameDuration) * frameTimeMs
+		frameAnalysisData = append(frameAnalysisData, FrameData{
+			frameNumber:      frameNumber,
+			uniqueFrameCount: totalUniqueFrames,
+			effectiveFPS:     effectiveFPS,
+			currentFrameTime: actualFrameTimeMs,
+			realFrameTime:    0, // Will be calculated in second pass
+		})
 
 		newSecond := int(float64(frameNumber-1) / fps)
 		if newSecond > currentSecond {
@@ -309,6 +390,32 @@ func analyzeFramePersistence(videoPath string, tolerance uint64) error {
 			log.Default().Printf("Second %d: %d unique frames", currentSecond+1, uniqueFramesInCurrentSecond)
 			currentSecond = newSecond
 			uniqueFramesInCurrentSecond = 0
+		}
+	}
+
+	// Record the final unique frame duration
+	if totalUniqueFrames > 0 {
+		if len(uniqueFrameDurations) < totalUniqueFrames {
+			uniqueFrameDurations = append(uniqueFrameDurations, currentUniqueFrameDuration)
+		} else {
+			uniqueFrameDurations[totalUniqueFrames-1] = currentUniqueFrameDuration
+		}
+	}
+
+	// SECOND PASS: Calculate real frame times and write CSV
+	if csvWriter != nil {
+		for i, frameData := range frameAnalysisData {
+			realFrameTimeMs := float64(uniqueFrameDurations[frameData.uniqueFrameCount-1]) * frameTimeMs
+			err := csvWriter.Write([]string{
+				strconv.Itoa(frameData.frameNumber),
+				fmt.Sprintf("%.2f", frameData.effectiveFPS),
+				fmt.Sprintf("%.2f", frameData.currentFrameTime),
+				strconv.Itoa(frameData.uniqueFrameCount),
+				fmt.Sprintf("%.2f", realFrameTimeMs),
+			})
+			if err != nil {
+				log.Default().Printf("Warning: failed to write CSV row %d: %v", i+1, err)
+			}
 		}
 	}
 
@@ -327,15 +434,15 @@ func analyzeFramePersistence(videoPath string, tolerance uint64) error {
 	log.Default().Printf("Total frames analyzed: %d", frameNumber)
 	log.Default().Printf("Video duration: %.2f seconds", float64(frameNumber)/fps)
 
-	totalUniqueFrames := 0
+	summaryUniqueFrames := 0
 	for i, count := range uniqueFramesPerSecond {
-		totalUniqueFrames += count
+		summaryUniqueFrames += count
 		log.Default().Printf("Second %d: %d unique frames", i+1, count)
 	}
 
-	log.Default().Printf("Total unique frames: %d", totalUniqueFrames)
+	log.Default().Printf("Total unique frames: %d", summaryUniqueFrames)
 	if len(uniqueFramesPerSecond) > 0 {
-		log.Default().Printf("Average unique frames per second: %.2f", float64(totalUniqueFrames)/float64(len(uniqueFramesPerSecond)))
+		log.Default().Printf("Average unique frames per second: %.2f", float64(summaryUniqueFrames)/float64(len(uniqueFramesPerSecond)))
 	}
 
 	if len(framePersistenceDurations) > 0 {
