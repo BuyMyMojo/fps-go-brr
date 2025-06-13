@@ -1,3 +1,9 @@
+## 0.2.0 (2025-06-14)
+
+### Feat
+
+- **LICENSE**: add dual licenses
+
 ## 0.1.1 (2025-06-14)
 
 ### Feat
