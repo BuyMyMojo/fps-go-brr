@@ -1,3 +1,4 @@
+// A Go CLI tool for video frame analysis and comparison. Analyze frame persistence, detect dropped frames, and export data for visualization tools like those used by Digital Foundry.
 package main
 
 import (
