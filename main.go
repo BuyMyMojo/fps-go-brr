@@ -23,7 +23,7 @@ func main() {
 				Usage: "Count frames",
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 
-					return count_video_frames(cmd.Args().First())
+					return countVideoFrames(cmd.Args().First())
 				},
 			},
 			{
@@ -40,12 +40,12 @@ func main() {
 
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 
-					first_frame, _ := getImageFromFilePath(cmd.StringArg("frame1"))
-					second_frame, _ := getImageFromFilePath(cmd.StringArg("frame2"))
+					firstFrame, _ := getImageFromFilePath(cmd.StringArg("frame1"))
+					secondFrame, _ := getImageFromFilePath(cmd.StringArg("frame2"))
 
-					first_rgba := imageToRGBA(first_frame)
-					second_rgba := imageToRGBA(second_frame)
-					return compare_frames(first_rgba, second_rgba)
+					firstRGBA := imageToRGBA(firstFrame)
+					secondRGBA := imageToRGBA(secondFrame)
+					return compareFrames(firstRGBA, secondRGBA)
 				},
 			},
 			{
@@ -62,12 +62,12 @@ func main() {
 
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 
-					first_frame, _ := getImageFromFilePath(cmd.StringArg("frame1"))
-					second_frame, _ := getImageFromFilePath(cmd.StringArg("frame2"))
+					firstFrame, _ := getImageFromFilePath(cmd.StringArg("frame1"))
+					secondFrame, _ := getImageFromFilePath(cmd.StringArg("frame2"))
 
-					first_rgba := imageToRGBA(first_frame)
-					second_rgba := imageToRGBA(second_frame)
-					return compare_frames_alt(first_rgba, second_rgba)
+					firstRGBA := imageToRGBA(firstFrame)
+					secondRGBA := imageToRGBA(secondFrame)
+					return compareFramesAlt(firstRGBA, secondRGBA)
 				},
 			},
 			{
@@ -120,7 +120,7 @@ func main() {
 	}
 }
 
-// count_video_frames
+// countVideoFrames
 // Prints out the total ammount of frames within `video`
 //
 // Parameters:
@@ -128,18 +128,18 @@ func main() {
 //
 // Returns:
 //   - error
-func count_video_frames(video string) error {
+func countVideoFrames(video string) error {
 	log.Default().Print("Trying to open video at: " + video)
-	video_file, _ := vidio.NewVideo(video)
+	videoFile, _ := vidio.NewVideo(video)
 	count := 0
-	for video_file.Read() {
+	for videoFile.Read() {
 		count++
 	}
 	log.Default().Println("Video total frames: " + strconv.Itoa(count))
 	return nil
 }
 
-func compare_frames(frame1 *image.RGBA, frame2 *image.RGBA) error {
+func compareFrames(frame1 *image.RGBA, frame2 *image.RGBA) error {
 	accumError := int64(0)
 	for i := 0; i < len(frame1.Pix); i++ {
 
@@ -151,7 +151,7 @@ func compare_frames(frame1 *image.RGBA, frame2 *image.RGBA) error {
 	return nil
 }
 
-func compare_frames_alt(frame1 *image.RGBA, frame2 *image.RGBA) error {
+func compareFramesAlt(frame1 *image.RGBA, frame2 *image.RGBA) error {
 	// diff_frame := image.NewRGBA(frame1.Rect)
 	accumError := int64(0)
 	for i := 0; i < len(frame1.Pix); i++ {
@@ -186,44 +186,44 @@ func isDiffUInt8WithTolerance(x, y uint8, tolerance uint64) bool {
 		return true
 	}
 
-		return false
+	return false
 
 }
 
-func countUniqueVideoFrames(video_path1 string, video_path2 string, min_diff uint64, use_sq_diff bool) error {
-	video1, _ := vidio.NewVideo(video_path1)
-	video2, _ := vidio.NewVideo(video_path2)
-	video1_frame := image.NewRGBA(image.Rect(0, 0, video1.Width(), video1.Height()))
-	video2_frame := image.NewRGBA(image.Rect(0, 0, video2.Width(), video2.Height()))
-	video1.SetFrameBuffer(video1_frame.Pix)
-	video2.SetFrameBuffer(video2_frame.Pix)
-	total_frames := 0
-	unique_frames := 0
+func countUniqueVideoFrames(videoPath1 string, videoPath2 string, minDiff uint64, useSqDiff bool) error {
+	video1, _ := vidio.NewVideo(videoPath1)
+	video2, _ := vidio.NewVideo(videoPath2)
+	video1Frame := image.NewRGBA(image.Rect(0, 0, video1.Width(), video1.Height()))
+	video2Frame := image.NewRGBA(image.Rect(0, 0, video2.Width(), video2.Height()))
+	video1.SetFrameBuffer(video1Frame.Pix)
+	video2.SetFrameBuffer(video2Frame.Pix)
+	totalFrames := 0
+	uniqueFrames := 0
 	for video1.Read() {
-		total_frames++
+		totalFrames++
 		video2.Read()
 		accumError := uint64(0)
-		for i := 0; i < len(video1_frame.Pix); i++ {
-			if use_sq_diff {
-				if isDiffUInt8WithTolerance(video1_frame.Pix[i], video2_frame.Pix[i], min_diff) {
+		for i := 0; i < len(video1Frame.Pix); i++ {
+			if useSqDiff {
+				if isDiffUInt8WithTolerance(video1Frame.Pix[i], video2Frame.Pix[i], minDiff) {
 					accumError++
 				}
 			} else {
-				if isDiffUInt8(video1_frame.Pix[i], video2_frame.Pix[i]) {
+				if isDiffUInt8(video1Frame.Pix[i], video2Frame.Pix[i]) {
 					accumError++
 				}
 			}
 		}
-		if min_diff <= accumError {
-			unique_frames++
-			log.Default().Println("[" + strconv.Itoa(total_frames) + "]Unique frame")
+		if minDiff <= accumError {
+			uniqueFrames++
+			log.Default().Println("[" + strconv.Itoa(totalFrames) + "]Unique frame")
 		} else {
-			log.Default().Println("[" + strconv.Itoa(total_frames) + "]Non-unique frame")
+			log.Default().Println("[" + strconv.Itoa(totalFrames) + "]Non-unique frame")
 		}
 	}
 	video1.Close()
 	video2.Close()
-	log.Default().Println(strconv.Itoa(unique_frames) + "/" + strconv.Itoa(total_frames) + " are unique!")
+	log.Default().Println(strconv.Itoa(uniqueFrames) + "/" + strconv.Itoa(totalFrames) + " are unique!")
 	return nil
 }
 
@@ -271,10 +271,10 @@ func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput strin
 			return fmt.Errorf("failed to create CSV file: %v", err)
 		}
 		defer csvFile.Close()
-		
+
 		csvWriter = csv.NewWriter(csvFile)
 		defer csvWriter.Flush()
-		
+
 		err = csvWriter.Write([]string{"frame", "average_fps", "frame_time", "unique_frame_count", "real_frame_time"})
 		if err != nil {
 			return fmt.Errorf("failed to write CSV header: %v", err)
@@ -289,10 +289,10 @@ func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput strin
 		currentFrameTime float64
 		realFrameTime    float64
 	}
-	
+
 	var frameAnalysisData []FrameData
 	var uniqueFrameDurations []int // Duration of each unique frame
-	
+
 	currentFrame := image.NewRGBA(image.Rect(0, 0, video.Width(), video.Height()))
 	previousFrame := image.NewRGBA(image.Rect(0, 0, video.Width(), video.Height()))
 	video.SetFrameBuffer(currentFrame.Pix)
@@ -319,7 +319,7 @@ func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput strin
 			uniqueFramesInCurrentSecond = 1
 			totalUniqueFrames = 1
 			currentUniqueFrameDuration = 1
-			
+
 			// Store data for first frame
 			currentTime := float64(frameNumber) / fps
 			effectiveFPS := float64(totalUniqueFrames) / currentTime
@@ -359,7 +359,7 @@ func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput strin
 					uniqueFrameDurations[totalUniqueFrames-1] = currentUniqueFrameDuration
 				}
 			}
-			
+
 			if consecutiveDuplicateCount > 1 {
 				persistenceMs := float64(consecutiveDuplicateCount+1) * frameTimeMs
 				framePersistenceDurations = append(framePersistenceDurations, persistenceMs)
@@ -370,7 +370,7 @@ func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput strin
 			uniqueFramesInCurrentSecond++
 			totalUniqueFrames++
 			copy(previousFrame.Pix, currentFrame.Pix)
-			
+
 			// Start tracking new unique frame
 			currentUniqueFrameDuration = 1
 		}
