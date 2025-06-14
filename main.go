@@ -173,9 +173,10 @@ func isDiffUInt8(x, y uint8) bool {
 	sq := d * d
 	if sq > 0 {
 		return true
-	} else {
-		return false
 	}
+
+	return false
+
 }
 
 func isDiffUInt8WithTolerance(x, y uint8, tolerance uint64) bool {
@@ -183,9 +184,10 @@ func isDiffUInt8WithTolerance(x, y uint8, tolerance uint64) bool {
 	sq := d * d
 	if sq > tolerance {
 		return true
-	} else {
-		return false
 	}
+
+		return false
+
 }
 
 func countUniqueVideoFrames(video_path1 string, video_path2 string, min_diff uint64, use_sq_diff bool) error {
