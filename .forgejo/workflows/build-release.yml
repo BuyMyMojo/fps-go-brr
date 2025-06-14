@@ -21,21 +21,26 @@ jobs:
       with:
         go-version: '1.21'
         
-    - name: Install UPX
+    - name: Install gox and UPX
       run: |
+        go install github.com/mitchellh/gox@latest
         wget -O upx.tar.xz https://github.com/upx/upx/releases/download/v5.0.1/upx-5.0.1-amd64_linux.tar.xz
         tar -xf upx.tar.xz
         cp upx-5.0.1-amd64_linux/upx /usr/local/bin/
         cp upx-5.0.1-amd64_linux/upx.1 /usr/local/share/man/man1/ || true
         chmod +x /usr/local/bin/upx
         
-    - name: Build normal binary
+    - name: Build cross-platform binaries
       run: |
-        go build -o fps-go-brr .
+        gox -os="darwin" -os="linux" -os="windows" -arch="amd64" -arch="arm64" -osarch="linux/386" -osarch="windows/386" -output="build/{{.Dir}}-{{.OS}}-{{.Arch}}"
         
-    - name: Build compact binary
+    - name: Compress Linux binaries with UPX
       run: |
-        ./build-compact.sh
+        for file in build/*linux*; do
+          if [ -f "$file" ]; then
+            upx --brute "$file"
+          fi
+        done
         
     - name: Get version
       id: version
@@ -46,23 +51,56 @@ jobs:
           echo "version=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         fi
         
-    - name: Create release directory
+    - name: Create platform bundles
       run: |
         mkdir -p release
-        cp fps-go-brr release/fps-go-brr-${{ steps.version.outputs.version }}
-        cp fps-go-brr-compact release/fps-go-brr-compact-${{ steps.version.outputs.version }}
         
-    - name: Upload normal binary
+        # Create Darwin (macOS) bundle
+        mkdir -p bundle-darwin
+        cp build/fps-go-brr-darwin-amd64 bundle-darwin/ 2>/dev/null || true
+        cp build/fps-go-brr-darwin-arm64 bundle-darwin/ 2>/dev/null || true
+        if [ "$(ls -A bundle-darwin 2>/dev/null)" ]; then
+          tar -czf release/fps-go-brr-darwin-${{ steps.version.outputs.version }}.tar.gz -C bundle-darwin .
+        fi
+        
+        # Create Linux bundle
+        mkdir -p bundle-linux
+        cp build/fps-go-brr-linux-amd64 bundle-linux/ 2>/dev/null || true
+        cp build/fps-go-brr-linux-arm64 bundle-linux/ 2>/dev/null || true
+        cp build/fps-go-brr-linux-386 bundle-linux/ 2>/dev/null || true
+        if [ "$(ls -A bundle-linux 2>/dev/null)" ]; then
+          tar -czf release/fps-go-brr-linux-${{ steps.version.outputs.version }}.tar.gz -C bundle-linux .
+        fi
+        
+        # Create Windows bundle
+        mkdir -p bundle-windows
+        cp build/fps-go-brr-windows-amd64.exe bundle-windows/ 2>/dev/null || true
+        cp build/fps-go-brr-windows-arm64.exe bundle-windows/ 2>/dev/null || true
+        cp build/fps-go-brr-windows-386.exe bundle-windows/ 2>/dev/null || true
+        if [ "$(ls -A bundle-windows 2>/dev/null)" ]; then
+          tar -czf release/fps-go-brr-windows-${{ steps.version.outputs.version }}.tar.gz -C bundle-windows .
+        fi
+        
+    - name: Upload Darwin bundle
       uses: forgejo/upload-artifact@v4
       with:
-        name: fps-go-brr-normal-${{ steps.version.outputs.version }}
-        path: release/fps-go-brr-${{ steps.version.outputs.version }}
+        name: fps-go-brr-darwin-${{ steps.version.outputs.version }}
+        path: release/fps-go-brr-darwin-${{ steps.version.outputs.version }}.tar.gz
+        if-no-files-found: ignore
         
-    - name: Upload compact binary
+    - name: Upload Linux bundle
       uses: forgejo/upload-artifact@v4
       with:
-        name: fps-go-brr-compact-${{ steps.version.outputs.version }}
-        path: release/fps-go-brr-compact-${{ steps.version.outputs.version }}
+        name: fps-go-brr-linux-${{ steps.version.outputs.version }}
+        path: release/fps-go-brr-linux-${{ steps.version.outputs.version }}.tar.gz
+        if-no-files-found: ignore
+        
+    - name: Upload Windows bundle
+      uses: forgejo/upload-artifact@v4
+      with:
+        name: fps-go-brr-windows-${{ steps.version.outputs.version }}
+        path: release/fps-go-brr-windows-${{ steps.version.outputs.version }}.tar.gz
+        if-no-files-found: ignore
         
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/')
@@ -75,7 +113,8 @@ jobs:
           ## fps-go-brr ${{ steps.version.outputs.version }}
           
           ### Downloads
-          - `fps-go-brr-${{ steps.version.outputs.version }}` - Normal build
-          - `fps-go-brr-compact-${{ steps.version.outputs.version }}` - Compact build (optimized with UPX compression)
+          - `fps-go-brr-darwin-${{ steps.version.outputs.version }}.tar.gz` - macOS builds (amd64, arm64)
+          - `fps-go-brr-linux-${{ steps.version.outputs.version }}.tar.gz` - Linux builds (amd64, arm64, 386) - compressed with UPX
+          - `fps-go-brr-windows-${{ steps.version.outputs.version }}.tar.gz` - Windows builds (amd64, arm64, 386)
           
-          The compact build is smaller but may have slightly slower startup time due to decompression.
+          Linux binaries are compressed with UPX for smaller size but may have slightly slower startup time due to decompression.
