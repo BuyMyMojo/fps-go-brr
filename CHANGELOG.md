@@ -1,3 +1,12 @@
+## 0.3.0 (2025-06-15)
+
+### Refactor
+
+- change variable and function names to fit with golang conventions
+- remove pointless else statments
+- add package string
+- **gitignore**: ignore compact build binary
+
 ## 0.2.0 (2025-06-14)
 
 ### Feat
