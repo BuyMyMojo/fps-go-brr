@@ -2,16 +2,21 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/csv"
 	"fmt"
 	"image"
 	"image/draw"
+	"image/png"
 	"log"
 	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 
 	vidio "github.com/AlexEidt/Vidio"
+	"github.com/cheggaaa/pb"
 	"github.com/urfave/cli/v3"
 )
 
@@ -105,11 +110,22 @@ func main() {
 						Usage: "Path to CSV file for frame data output",
 						Value: "",
 					},
+					&cli.BoolFlag{
+						Name:  "resdet",
+						Usage: "use the resdet cli to measure each frame's resoltion\nWARNING: This will slow the process down by a LOT",
+						Value: false,
+					},
+
+					&cli.BoolFlag{
+						Name:  "verbose",
+						Usage: "print out total unique frames for every second of measurements",
+						Value: false,
+					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					tolerance := uint64(cmd.Float64("tolerance"))
 					csvOutput := cmd.String("csv-output")
-					return analyzeFramePersistence(cmd.StringArg("video"), tolerance, csvOutput)
+					return analyzeFramePersistence(cmd.StringArg("video"), tolerance, csvOutput, cmd.Bool("resdet"), cmd.Bool("verbose"))
 				},
 			},
 		},
@@ -251,7 +267,7 @@ func getImageFromFilePath(filePath string) (image.Image, error) {
 	return image, err
 }
 
-func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput string) error {
+func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput string, toggleResdet bool, verbose bool) error {
 	video, err := vidio.NewVideo(videoPath)
 	if err != nil {
 		return err
@@ -288,6 +304,8 @@ func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput strin
 		effectiveFPS     float64
 		currentFrameTime float64
 		realFrameTime    float64
+		frameWidth       int
+		frameHeight      int
 	}
 
 	var frameAnalysisData []FrameData
@@ -301,6 +319,8 @@ func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput strin
 	var frameNumber int
 	var uniqueFramesPerSecond []int
 	var framePersistenceDurations []float64
+	var frameWidthMeasurements []int
+	var frameHeightMeasurements []int
 
 	currentSecond := 0
 	uniqueFramesInCurrentSecond := 0
@@ -310,8 +330,43 @@ func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput strin
 
 	hasFirstFrame := false
 
+	bar := pb.StartNew(video.Frames())
+
 	for video.Read() {
 		frameNumber++
+
+		// frame colum will be full of 0s normally, not the worst compromise
+		frameWidth := 0
+		frameHeight := 0
+
+		// mesure resoltion
+		if toggleResdet {
+			frameFile, err0 := os.Create("/tmp/frame.png")
+
+			err1 := png.Encode(frameFile, currentFrame)
+
+			out, err2 := exec.Command("resdet", "-v", "1", frameFile.Name()).Output()
+
+			err3 := frameFile.Close()
+
+			err4 := os.Remove(frameFile.Name())
+
+			formattedOutput := strings.Split(string(out), " ")
+
+			frameWidthOut, err5 := strconv.Atoi(formattedOutput[0])
+
+			frameHeightOut, err6 := strconv.Atoi(strings.TrimSuffix(formattedOutput[1], "\n"))
+
+			if err := cmp.Or(err0, err1, err2, err3, err4, err5, err6); err != nil {
+				log.Fatal(err)
+			}
+
+			frameWidth = frameWidthOut
+			frameHeight = frameHeightOut
+		}
+
+		frameWidthMeasurements = append(frameWidthMeasurements, frameWidth)
+		frameHeightMeasurements = append(frameHeightMeasurements, frameHeight)
 
 		if !hasFirstFrame {
 			copy(previousFrame.Pix, currentFrame.Pix)
@@ -330,6 +385,8 @@ func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput strin
 				effectiveFPS:     effectiveFPS,
 				currentFrameTime: actualFrameTimeMs,
 				realFrameTime:    0, // Will be calculated in second pass
+				frameWidth:       frameWidth,
+				frameHeight:      frameHeight,
 			})
 			continue
 		}
@@ -385,16 +442,24 @@ func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput strin
 			effectiveFPS:     effectiveFPS,
 			currentFrameTime: actualFrameTimeMs,
 			realFrameTime:    0, // Will be calculated in second pass
+			frameWidth:       frameWidth,
+			frameHeight:      frameHeight,
 		})
 
-		newSecond := int(float64(frameNumber-1) / fps)
-		if newSecond > currentSecond {
-			uniqueFramesPerSecond = append(uniqueFramesPerSecond, uniqueFramesInCurrentSecond)
-			log.Default().Printf("Second %d: %d unique frames", currentSecond+1, uniqueFramesInCurrentSecond)
-			currentSecond = newSecond
-			uniqueFramesInCurrentSecond = 0
+		if verbose {
+			newSecond := int(float64(frameNumber-1) / fps)
+			if newSecond > currentSecond {
+				uniqueFramesPerSecond = append(uniqueFramesPerSecond, uniqueFramesInCurrentSecond)
+				log.Default().Printf("Second %d: %d unique frames", currentSecond+1, uniqueFramesInCurrentSecond)
+				currentSecond = newSecond
+				uniqueFramesInCurrentSecond = 0
+			}
 		}
+
+		bar.Increment()
 	}
+
+	bar.Finish()
 
 	// Record the final unique frame duration
 	if totalUniqueFrames > 0 {
@@ -415,6 +480,8 @@ func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput strin
 				fmt.Sprintf("%.2f", frameData.currentFrameTime),
 				strconv.Itoa(frameData.uniqueFrameCount),
 				fmt.Sprintf("%.2f", realFrameTimeMs),
+				strconv.Itoa(frameData.frameWidth),
+				strconv.Itoa(frameData.frameHeight),
 			})
 			if err != nil {
 				log.Default().Printf("Warning: failed to write CSV row %d: %v", i+1, err)
@@ -459,6 +526,27 @@ func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput strin
 		log.Default().Printf("Number of persistence events: %d", len(framePersistenceDurations))
 	} else {
 		log.Default().Printf("No frame persistence detected (all frames are unique)")
+	}
+
+	if len(frameWidthMeasurements) > 0 && len(frameHeightMeasurements) > 0 {
+		sumWidth := 0
+		sumHeight := 0
+
+		for _, width := range frameWidthMeasurements {
+			sumWidth += width
+		}
+
+		if sumWidth != 0 {
+
+			for _, height := range frameHeightMeasurements {
+				sumHeight += height
+			}
+
+			avgWidth := float64(sumWidth) / float64(len(frameWidthMeasurements))
+			avgHeight := float64(sumHeight) / float64(len(frameHeightMeasurements))
+			log.Default().Printf("Average Width: %.2f", avgWidth)
+			log.Default().Printf("Average Height: %.2f", avgHeight)
+		}
 	}
 
 	return nil
