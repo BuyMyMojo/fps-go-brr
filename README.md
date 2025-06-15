@@ -12,6 +12,7 @@ A Go CLI tool for video frame analysis and comparison. Analyze frame persistence
 - **Configurable Tolerance**: Adjust pixel difference sensitivity for noisy videos
 - **Real-time Analysis**: Stream processing for efficient memory usage
 - **Two-pass Architecture**: Accurate frame timing calculations for smooth visualizations
+- **Resolution Measurements**: Using the [resdet](https://github.com/0x09/resdet) cli to log dynamic resolutions (Requires resdet to be installed seperately)
 
 ## Quick Start
 
