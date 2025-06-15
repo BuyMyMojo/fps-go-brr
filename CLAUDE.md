@@ -43,6 +43,10 @@ go build -o fps-go-brr .
 # Optimized compact build (requires UPX)
 ./build-compact.sh
 ./fps-go-brr-compact <command> [args]
+
+# Cross-platform build (requires gox)
+go install github.com/mitchellh/gox@latest
+gox -os="darwin" -os="linux" -os="windows" -arch="amd64" -arch="arm64" -osarch="linux/386" -osarch="windows/386"
 ```
 
 ### Testing
@@ -57,10 +61,12 @@ go mod download
 ```
 
 ### Release Builds
-- Forgejo Actions automatically build and release both normal and compact binaries on tag pushes
+- Forgejo Actions automatically build and release cross-platform binaries on tag pushes
 - Uses custom runner: `9950x`
-- Normal and compact builds are uploaded as separate artifacts
-- UPX compression applied to compact builds for size optimization
+- Cross-compilation via `gox` for Darwin (macOS), Linux, and Windows
+- Multiple architectures: amd64, arm64, and 386 (Linux/Windows only)
+- UPX compression applied to Linux builds only using `--brute` flag
+- Platform-specific `.tar.gz` bundles for distribution
 
 ## Repository Information
 
@@ -80,6 +86,7 @@ This project draws inspiration from:
 ## Memories
 
 - The forgejo workflow runner is executed as root so it does not need to use root
+- Updated workflow to use `gox` for cross-compilation and create platform-specific `.tar.gz` bundles
 
 ## CLI Usage
 

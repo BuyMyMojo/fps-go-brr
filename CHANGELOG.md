@@ -1,3 +1,15 @@
+## 0.5.0 (2025-06-16)
+
+### Feat
+
+- **main**: add a ton of features - progress bar - frame res measurements - verbosity flag
+- add gox build script
+
+### Refactor
+
+- **README**: add resdet info
+- **README**: add new lines before lists to fit markdown standard
+
 ## 0.4.0 (2025-06-15)
 
 ## 0.3.0 (2025-06-15)
