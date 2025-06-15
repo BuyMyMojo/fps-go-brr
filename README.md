@@ -106,6 +106,7 @@ This is an early-stage project. Contributions, bug reports, and feature requests
 ## Technical Details
 
 Built with:
+
 - **CLI Framework**: [urfave/cli/v3](https://github.com/urfave/cli)
 - **Video Processing**: [AlexEidt/Vidio](https://github.com/AlexEidt/Vidio)
 - **Image Processing**: Go standard library
@@ -137,6 +138,7 @@ The testing phase for Claude's coding agent in this repo is finished and it shal
 SPDX-License-Identifier: MIT OR Apache-2.0
 
 This project is dual-licensed under your choice of:
+
 - MIT License - see [LICENSE.MIT](LICENSE.MIT) file for details
 - Apache License 2.0 - see [LICENSE.Apache-2.0](LICENSE.Apache-2.0) file for details
 
