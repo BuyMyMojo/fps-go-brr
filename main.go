@@ -291,7 +291,7 @@ func analyzeFramePersistence(videoPath string, tolerance uint64, csvOutput strin
 		csvWriter = csv.NewWriter(csvFile)
 		defer csvWriter.Flush()
 
-		err = csvWriter.Write([]string{"frame", "average_fps", "frame_time", "unique_frame_count", "real_frame_time"})
+		err = csvWriter.Write([]string{"frame", "average_fps", "frame_time", "unique_frame_count", "real_frame_time", "frame_width", "frame_height"})
 		if err != nil {
 			return fmt.Errorf("failed to write CSV header: %v", err)
 		}
