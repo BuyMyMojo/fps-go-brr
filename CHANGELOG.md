@@ -1,3 +1,9 @@
+## 0.5.1 (2025-06-17)
+
+### Fix
+
+- **csv output**: add missing frame width and height headers
+
 ## 0.5.0 (2025-06-16)
 
 ### Feat
